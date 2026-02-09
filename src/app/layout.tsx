@@ -13,11 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cloudly | Organic Digital Infrastructure",
-  description: "Transform your data streams into a fluid architecture. Complexity, Cleared.",
+  title: "Cloudly | Above The Software",
+  description: "Transform your data streams into a fluid architecture. Cloudly Software.",
 };
 
 import { ThemeProvider } from "../context/ThemeContext";
+import { LanguageProvider } from "../context/LanguageContext";
 
 // ... (existing imports)
 
@@ -33,7 +34,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
-          {children}
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

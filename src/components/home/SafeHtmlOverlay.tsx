@@ -3,10 +3,12 @@
 import { motion, useScroll, useTransform, useMotionTemplate, useMotionValue } from "framer-motion";
 import { MouseEvent, useRef } from "react";
 import { useTheme } from "../../context/ThemeContext";
-import { Sun, Moon, Cloud, Menu, ArrowRight } from "lucide-react";
+import { useLanguage } from "../../context/LanguageContext";
+import { Sun, Moon, Cloud, Menu, ArrowRight, Languages } from "lucide-react";
 
 function SpotlightNav() {
     const { theme, toggleTheme, setTheme } = useTheme();
+    const { t, toggleLanguage, language } = useLanguage();
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
 
@@ -86,15 +88,24 @@ function SpotlightNav() {
 
             {/* Middle: Desktop Nav (Hidden on Mobile) */}
             <div className={`hidden md:flex items-center gap-8 ${isDark ? 'text-slate-400' : 'text-slate-500'} text-sm font-medium relative z-10`}>
-                {['Features', 'Solutions', 'Docs', 'Pricing'].map((item) => (
+                {['features', 'solutions', 'docs', 'pricing'].map((item) => (
                     <a key={item} href="#" className={`hover:${textColor} transition-colors duration-300`}>
-                        {item}
+                        {t(item)}
                     </a>
                 ))}
             </div>
 
             {/* Right: Actions */}
             <div className="flex items-center gap-3 relative z-10">
+                {/* Language Toggle */}
+                <button
+                    onClick={toggleLanguage}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 ${isDark ? 'hover:bg-white/10 text-slate-300' : 'hover:bg-slate-200/50 text-slate-600'}`}
+                >
+                    <Languages className="w-4 h-4" />
+                    <span className="text-xs font-bold">{language.toUpperCase()}</span>
+                </button>
+
                 {/* Theme Toggle - Long Press for Pink */}
                 <button
                     onMouseDown={handlePressStart}
@@ -110,7 +121,7 @@ function SpotlightNav() {
 
                 {/* Primary CTA */}
                 <button className={`group flex items-center gap-2 pl-5 pr-4 py-2 rounded-full text-xs md:text-sm font-semibold transition-all duration-300 hover:scale-105 active:scale-95 ${isDark ? 'bg-white text-black hover:bg-slate-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
-                    <span>Get Started</span>
+                    <span>{t("get_started")}</span>
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                 </button>
 

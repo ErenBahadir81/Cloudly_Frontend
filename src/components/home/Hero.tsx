@@ -18,12 +18,12 @@ export default function Hero() {
                     transition={{ delay: 0.2, duration: 1 }}
                     className="inline-block mb-6 text-sm md:text-base font-medium tracking-[0.3em] text-cyan-400/80 uppercase"
                 >
-                    Complexity, Cleared
+                    Cloudly Software
                 </motion.span>
 
                 <h1 className="text-5xl md:text-9xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/40 mb-8 drop-shadow-[0_0_30px_rgba(255,255,255,0.1)]">
-                    The Organic <br className="hidden md:block" />
-                    Infrastructure.
+                    Above The <br className="hidden md:block" />
+                    Software.
                 </h1>
 
                 <motion.p

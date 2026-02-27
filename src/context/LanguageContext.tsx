@@ -27,7 +27,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         "pricing": { en: "Pricing", tr: "Fiyatlandırma" },
         "get_started": { en: "Get Started", tr: "Başlayın" },
         "above_software": { en: "ABOVE THE SOFTWARE", tr: "YAZILIMIN ÖTESİNDE" },
-        "layers_building": { en: "Layers keep building.", tr: "Katmanlar durmadan çoğalır." },
+        "layers_building": { en: "Welcome to cloud-native engineering.", tr: "Bulut tabanlı mühendisliğe hoş geldiniz." },
     };
 
     const t = (key: string) => {

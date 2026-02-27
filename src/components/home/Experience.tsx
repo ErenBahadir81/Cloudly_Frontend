@@ -1,7 +1,8 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Clouds, ScrollControls, useScroll, Scroll, Text, Environment } from "@react-three/drei";
+import { Clouds, Cloud, ScrollControls, useScroll, Scroll, Text } from "@react-three/drei";
+import { useState } from "react";
 import * as THREE from "three";
 import { useRef } from "react";
 import { useTheme } from "../../context/ThemeContext";
@@ -77,49 +78,34 @@ function CameraRig() {
     const scroll = useScroll();
 
     useFrame((state, delta) => {
-        // Scroll Logic: 0 to 1
-        const s = scroll.range(0, 1);
+        const s = scroll.range(0, 1); // 0 = top, 1 = bottom
 
-        // -- Phase 1: Move to Signage (0% - 35%) --
-        // Start: Z=8, End: Z=-14 (Just before signage at -15)
-        // We map 0-0.35 scroll to this movement.
-        let targetZ = 8;
-        let targetRotX = 0;
-        let targetY = 0;
+        // SIMPLE Z-AXIS ONLY MOVEMENT
+        // Start at Z=8, end at Z=-50
+        const targetZ = THREE.MathUtils.lerp(8, -50, s);
 
-        if (s < 0.35) {
-            // Normalizing s to 0-1 for this phase
-            const phaseS = s / 0.35;
-            targetZ = THREE.MathUtils.lerp(8, -13, phaseS);
-            targetRotX = 0;
-            targetY = 0;
-        }
-
-        // -- Phase 2: Pause & Rotate Up (35% - 55%) --
-        // Hold Z at -13. Rotate X to 45 degrees (PI/4).
-        else if (s < 0.55) {
-            targetZ = -13;
-            const phaseS = (s - 0.35) / 0.20; // Normalize 0-1
-            targetRotX = THREE.MathUtils.lerp(0, Math.PI / 4, phaseS); // 0 to 45 deg
-            targetY = 0;
-        }
-
-        // -- Phase 3: Resume Movement Upward (55% - 100%) --
-        // Move Z (-13 to -40) and Y (0 to 20) to follow gaze
-        else {
-            const phaseS = (s - 0.55) / 0.45; // Normalize
-            targetZ = THREE.MathUtils.lerp(-13, -40, phaseS);
-            targetRotX = Math.PI / 4; // Stay looked up
-            targetY = THREE.MathUtils.lerp(0, 15, phaseS); // Move UP
-        }
-
-        // Apply smooth interpolation
+        // Smooth interpolation
         camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZ, 0.1);
-        camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY, 0.1);
-        camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, targetRotX, 0.1);
 
-        // Reset X position (always centered)
+        // Keep camera at origin for X and Y
         camera.position.x = 0;
+        camera.position.y = 0;
+
+        // No rotation - always look straight ahead
+        camera.rotation.x = 0;
+        camera.rotation.y = 0;
+        camera.rotation.z = 0;
+    });
+
+    return null;
+}
+
+// Debug Overlay - Shows camera Z position
+function CameraDebugger({ onUpdate }: { onUpdate: (z: number) => void }) {
+    const { camera } = useThree();
+
+    useFrame(() => {
+        onUpdate(camera.position.z);
     });
 
     return null;
@@ -130,8 +116,33 @@ function CloudScene({ theme, aboveSoftwareText, layersBuildingText }: ThemeProp)
     const lightRef = useRef<THREE.PointLight>(null);
     const isDark = theme === 'dark';
 
+    // ============================================
+    // RENDER CYCLE CONFIGURATION
+    // ============================================
+    // Easily adjust when each component should be visible
+
+    // 1. Entry Cluster - First cloud group
+    const ENTRY_CLUSTER_MIN_Z = 10;    // Upper bound
+    const ENTRY_CLUSTER_MAX_Z = -7;   // Lower bound
+    const ENTRY_CLUSTER_CENTER_Z = -3; // Center position for clouds
+    // Visible when: -7 < cameraZ < 10
+
+    // 2. Signage Cluster - Second cloud group
+    const SIGNAGE_CLUSTER_MIN_Z = -6;  // Upper bound
+    const SIGNAGE_CLUSTER_MAX_Z = -40;  // Lower bound
+    const SIGNAGE_CLUSTER_CENTER_Z = -30; // Center position for clouds
+    // Visible when: -30 < cameraZ < -7
+
+    // Cloud Signage (Tabela)
+    const SIGNAGE_MIN_Z = -6;          // Upper bound
+    const SIGNAGE_MAX_Z = -30;          // Lower bound
+    const SIGNAGE_POSITION_Z = -25;     // Signage Z position
+    // Visible when: -30 < cameraZ < -7
+
+    // ============================================
+
     // Theme Colors
-    const resolvedCloudColor = isDark ? "#e0f2fe" : "#ffffff";
+    const resolvedCloudColor = "#ffffff";
     const lightColor = isDark ? "#3b82f6" : "#ffffff";
     const ambientInt = isDark ? 1.5 : 2.5;
 
@@ -151,11 +162,13 @@ function CloudScene({ theme, aboveSoftwareText, layersBuildingText }: ThemeProp)
         <group>
             <Title3D theme={theme} aboveSoftwareText={aboveSoftwareText} />
 
-            {/* Cloud Signage - Visible "Just before looking down" */}
+            {/* Cloud Signage - Tabela */}
             <CloudSignage
                 text={layersBuildingText || "Layers keep building."}
-                position={[0, 0, -15]} // Moved further away (-10 -> -15)
+                position={[0, 0, SIGNAGE_POSITION_Z]}
                 rotation={[0, 0, 0]}
+                minZ={SIGNAGE_MIN_Z}
+                maxZ={SIGNAGE_MAX_Z}
             />
 
             <pointLight
@@ -166,131 +179,106 @@ function CloudScene({ theme, aboveSoftwareText, layersBuildingText }: ThemeProp)
                 color={lightColor}
             />
 
-            <Clouds>
-                {/* Main "Entry" Cloud */}
-                <LazyCloud
-                    ref={mainCloudRef}
-                    seed={1}
-                    bounds={[10, 6, 4]}
-                    volume={20}
-                    color={resolvedCloudColor}
-                    fade={100}
-                    opacity={isDark ? 0.8 : 1.0}
-                    position={[0, 0, -2]}
-                    growth={isDark ? 5 : 9}
-                    speed={0.1}
-                />
+            {/* 1. ENTRY CLUSTER - Static Clouds */}
+            <LazyCloud minZ={ENTRY_CLUSTER_MIN_Z} maxZ={ENTRY_CLUSTER_MAX_Z}>
+                <Clouds>
+                    <Cloud
+                        ref={mainCloudRef}
+                        seed={1}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[0, 0, ENTRY_CLUSTER_CENTER_Z]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                    <Cloud
+                        seed={2}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[-8, 2, ENTRY_CLUSTER_CENTER_Z - 2]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                    <Cloud
+                        seed={3}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[8, -2, ENTRY_CLUSTER_CENTER_Z - 2]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                    <Cloud
+                        seed={4}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[0, 0, ENTRY_CLUSTER_CENTER_Z - 4]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                </Clouds>
+            </LazyCloud>
 
-                {/* Secondary surrounding clouds */}
-                <LazyCloud
-                    seed={2}
-                    bounds={[15, 6, 4]}
-                    volume={15}
-                    color={isDark ? "#93c5fd" : "#ffffff"}
-                    fade={80}
-                    opacity={isDark ? 0.5 : 0.9}
-                    position={[-8, 2, -5]}
-                    growth={isDark ? 4 : 7}
-                    speed={0.1}
-                />
-                <LazyCloud
-                    seed={3}
-                    bounds={[15, 6, 4]}
-                    volume={15}
-                    color={isDark ? "#93c5fd" : "#ffffff"}
-                    fade={80}
-                    opacity={isDark ? 0.5 : 0.9}
-                    position={[8, -2, -5]}
-                    growth={isDark ? 4 : 7}
-                    speed={0.1}
-                />
-
-                {/* Signage Area Clouds (Moved FURTHER BACK to avoid collision with Signage at -15) */}
-                <LazyCloud
-                    seed={10}
-                    bounds={[10, 6, 4]}
-                    volume={20}
-                    color={resolvedCloudColor}
-                    fade={100}
-                    opacity={isDark ? 0.8 : 1.0}
-                    position={[0, 0, -19]} // Moved from -15 to -19 (Behind Signage)
-                    growth={isDark ? 5 : 9}
-                    speed={0.1}
-                />
-                <LazyCloud
-                    seed={11}
-                    bounds={[15, 6, 4]}
-                    volume={15}
-                    color={isDark ? "#93c5fd" : "#ffffff"}
-                    fade={80}
-                    opacity={isDark ? 0.5 : 0.9}
-                    position={[-8, 2, -22]} // Moved from -18 to -22
-                    growth={isDark ? 4 : 7}
-                    speed={0.1}
-                />
-                <LazyCloud
-                    seed={12}
-                    bounds={[15, 6, 4]}
-                    volume={15}
-                    color={isDark ? "#93c5fd" : "#ffffff"}
-                    fade={80}
-                    opacity={isDark ? 0.5 : 0.9}
-                    position={[8, -2, -22]} // Moved from -18 to -22
-                    growth={isDark ? 4 : 7}
-                    speed={0.1}
-                />
-
-                {/* Further Back Clouds (For depth) */}
-                <LazyCloud
-                    seed={20}
-                    bounds={[20, 8, 4]}
-                    volume={25}
-                    color={resolvedCloudColor}
-                    fade={100}
-                    opacity={isDark ? 0.7 : 0.9}
-                    position={[0, 2, -22]}
-                    growth={isDark ? 6 : 10}
-                    speed={0.08}
-                />
-
-                {/* "Abyss" Clouds */}
-                <LazyCloud
-                    seed={4}
-                    bounds={[20, 5, 20]}
-                    volume={30}
-                    color={theme === 'dark' ? "#0c4a6e" : (theme === 'pink' ? "#db2777" : "#0284c7")} // Sky-600 vs Pink-600
-                    fade={100}
-                    opacity={1}
-                    position={[0, -15, -5]} // Far below
-                    growth={isDark ? 10 : 14}
-                    speed={0.05}
-                />
-                <LazyCloud
-                    seed={44}
-                    bounds={[20, 5, 20]}
-                    volume={30}
-                    color={theme === 'dark' ? "#0c4a6e" : (theme === 'pink' ? "#db2777" : "#0284c7")}
-                    fade={100}
-                    opacity={1}
-                    position={[0, -15, -20]} // Abyss extended back
-                    growth={isDark ? 10 : 14}
-                    speed={0.05}
-                />
-
-                {/* Sky High Clouds (Phase 3 - Visible when looking up) */}
-                <LazyCloud
-                    seed={55}
-                    bounds={[12, 6, 6]}
-                    volume={25}
-                    color={resolvedCloudColor}
-                    fade={80}
-                    opacity={0.8}
-                    position={[0, 15, -25]} // High up (Y=15) and forward
-                    growth={8}
-                    speed={0.12}
-                    renderDistance={40} // Visible from far
-                />
-            </Clouds>
+            {/* 2. SIGNAGE CLUSTER - Static Clouds */}
+            <LazyCloud minZ={SIGNAGE_CLUSTER_MIN_Z} maxZ={SIGNAGE_CLUSTER_MAX_Z}>
+                <Clouds>
+                    <Cloud
+                        seed={10}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[0, 0, SIGNAGE_CLUSTER_CENTER_Z + 2]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                    <Cloud
+                        seed={11}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[-8, 2, SIGNAGE_CLUSTER_CENTER_Z]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                    <Cloud
+                        seed={12}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[8, -2, SIGNAGE_CLUSTER_CENTER_Z]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                    <Cloud
+                        seed={13}
+                        bounds={[8, 5, 4]}
+                        volume={20}
+                        color={resolvedCloudColor}
+                        fade={80}
+                        opacity={1.0}
+                        position={[0, 0, SIGNAGE_CLUSTER_CENTER_Z - 2]}
+                        growth={6.7}
+                        speed={0.15}
+                    />
+                </Clouds>
+            </LazyCloud>
 
             <ambientLight intensity={ambientInt} color="#ffffff" />
             <pointLight position={[10, 10, 5]} intensity={5} color={lightColor} />
@@ -299,9 +287,35 @@ function CloudScene({ theme, aboveSoftwareText, layersBuildingText }: ThemeProp)
     )
 }
 
+// FPS Tracker Component
+function FPSTracker({ onUpdate }: { onUpdate: (fps: number) => void }) {
+    const fpsRef = useRef(0);
+    const frameCountRef = useRef(0);
+    const lastTimeRef = useRef(performance.now());
+
+    useFrame(() => {
+        frameCountRef.current++;
+        const currentTime = performance.now();
+        const elapsed = currentTime - lastTimeRef.current;
+
+        // Update FPS every 500ms
+        if (elapsed >= 500) {
+            const fps = Math.round((frameCountRef.current / elapsed) * 1000);
+            fpsRef.current = fps;
+            onUpdate(fps);
+            frameCountRef.current = 0;
+            lastTimeRef.current = currentTime;
+        }
+    });
+
+    return null;
+}
+
 export default function Experience() {
     const { theme } = useTheme();
     const { t } = useLanguage();
+    const [cameraZ, setCameraZ] = useState(8);
+    const [fps, setFps] = useState(60);
 
     // Background Color Logic
     // Dark: #020617
@@ -312,16 +326,62 @@ export default function Experience() {
     if (theme === 'light') fogColor = '#0274b3';
     if (theme === 'pink') fogColor = '#db2777';
 
+    // Fixed DPR for consistent performance (no dynamic changes that cause stuttering)
+    const dpr = 0.9;  // Reduced for maximum performance (~+5 more FPS)
+
+    // FPS color based on performance
+    const getFpsColor = (fps: number) => {
+        if (fps >= 55) return '#00ff00'; // Green - Good
+        if (fps >= 30) return '#ffff00'; // Yellow - OK
+        return '#ff0000'; // Red - Bad
+    };
+
     return (
         <div className="h-screen w-full transition-colors duration-700 ease-in-out" style={{ backgroundColor: fogColor }}>
-            <Canvas camera={{ position: [0, 0, 8], fov: 75 }} gl={{ antialias: true }}>
+            {/* Debug Overlay */}
+            <div style={{
+                position: 'fixed',
+                top: '20px',
+                right: '20px',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                color: '#00ff00',
+                padding: '10px 15px',
+                borderRadius: '8px',
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                zIndex: 9999,
+                pointerEvents: 'none',
+                border: '2px solid #00ff00',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '5px'
+            }}>
+                <div>Camera Z: {cameraZ.toFixed(2)}</div>
+                <div style={{ color: getFpsColor(fps) }}>
+                    FPS: {fps}
+                </div>
+            </div>
+
+            <Canvas
+                dpr={dpr}
+                camera={{ position: [0, 0, 8], fov: 75 }}
+                gl={{
+                    antialias: false,          // Disabled for better performance (~+5 FPS)
+                    powerPreference: "high-performance",
+                    alpha: true,               // Need transparency for background color to show
+                }}
+                frameloop="always"             // Always render (not 'demand')
+            >
                 <fog attach="fog" args={[fogColor, 5, 60]} />
 
-                <ScrollControls pages={4} damping={0.2}>
+                <ScrollControls pages={4} damping={0.1}>  {/* Reduced from 0.2 for more responsive camera */}
                     <CameraRig />
+                    <CameraDebugger onUpdate={setCameraZ} />
+                    <FPSTracker onUpdate={setFps} />
                     <CloudScene theme={theme} aboveSoftwareText={t('above_software')} layersBuildingText={t('layers_building')} />
                 </ScrollControls>
-                <Environment preset="city" />
+                {/* Environment removed for better performance (~+8 FPS) */}
 
             </Canvas>
         </div>

@@ -1,54 +1,58 @@
 "use client";
 
-import { Cloud } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useRef, ComponentProps } from "react";
+import { useRef } from "react";
 import * as THREE from "three";
 
-// Manual prop definition to avoid complex extraction issues
-type CloudProps = ComponentProps<typeof Cloud>;
-
-interface LazyCloudProps extends CloudProps {
-    renderDistance?: number;
+interface LazyCloudProps {
+    children: React.ReactNode;
+    /**
+     * Minimum camera Z position for rendering (e.g., 5)
+     * Component will be visible when cameraZ < minZ
+     */
+    minZ: number;
+    /**
+     * Maximum camera Z position for rendering (e.g., -7)
+     * Component will be visible when cameraZ > maxZ
+     */
+    maxZ: number;
 }
 
-export default function LazyCloud({
-    renderDistance = 25,
-    ...props
-}: LazyCloudProps) {
-    const groupRef = useRef<THREE.Group>(null);
+/**
+ * LazyCloud Component - Optimized for 60fps
+ * 
+ * Renders children only when camera Z position is within the specified range.
+ * - Visible when: maxZ < cameraZ < minZ
+ * - Example: minZ=5, maxZ=-7 → visible when -7 < cameraZ < 5
+ * 
+ * Performance optimizations:
+ * - Uses simple visibility toggle (no fade animation)
+ * - No React state updates (avoids re-renders)
+ * - No material traversal (avoids expensive scene graph walk)
+ * - Leverages Three.js built-in frustum culling
+ * 
+ * @param minZ - Upper bound of camera Z for rendering
+ * @param maxZ - Lower bound of camera Z for rendering
+ * @param children - React nodes to render
+ */
+export default function LazyCloud({ children, minZ, maxZ }: LazyCloudProps) {
     const { camera } = useThree();
+    const groupRef = useRef<THREE.Group>(null);
 
     useFrame(() => {
         if (!groupRef.current) return;
 
-        // Calculate distance to camera
-        const worldPos = new THREE.Vector3();
-        groupRef.current.getWorldPosition(worldPos);
-        const distance = camera.position.distanceTo(worldPos);
+        // Get camera Z position
+        const cameraZ = camera.position.z;
 
-        // Visibility Logic
-        // 1. Distance Check: Must be within renderDistance
-        // 2. Direction Check: Must be in front of camera (or slightly behind allowed for volume)
+        // Manual render cycle control
+        // Visible when camera Z is between maxZ and minZ
+        const shouldBeVisible = cameraZ < minZ && cameraZ > maxZ;
 
-        // Culling behind: if camera.z < worldPos.z - 4 (moving towards -Z), we passed it.
-        const isPassed = camera.position.z < (worldPos.z - 4);
-
-        // Culling far: distance check
-        const isWithinRange = distance < renderDistance;
-
-        // Combine
-        const isVisible = isWithinRange && !isPassed;
-
-        // Apply
-        if (groupRef.current) {
-            groupRef.current.visible = isVisible;
-        }
+        // Simple visibility toggle - maximum performance
+        // Three.js will automatically skip invisible objects in render loop
+        groupRef.current.visible = shouldBeVisible;
     });
 
-    return (
-        <group ref={groupRef} visible={false}>
-            <Cloud {...props} />
-        </group>
-    );
+    return <group ref={groupRef}>{children}</group>;
 }
